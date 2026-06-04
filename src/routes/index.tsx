@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { MapPin, Bell, RefreshCw, Download, AlertTriangle } from "lucide-react";
 import { getDashboardData, type Submission } from "@/lib/kobo.functions";
+import { GpsLeafletMap } from "@/components/GpsLeafletMap";
 
 const dashQuery = queryOptions({
   queryKey: ["kobo-dashboard"],
