@@ -285,7 +285,7 @@ function Dashboard() {
           </Panel>
 
           <Panel title="Spatial Locations (Captured GPS)">
-            <GpsMap points={gpsPoints} />
+            <GpsLeafletMap points={gpsPoints} />
           </Panel>
         </section>
 
