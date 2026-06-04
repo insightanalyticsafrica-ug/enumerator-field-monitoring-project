@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { MapPin, Bell, RefreshCw, Download, AlertTriangle } from "lucide-react";
 import { getDashboardData, type Submission } from "@/lib/kobo.functions";
+import { GpsLeafletMap } from "@/components/GpsLeafletMap";
 
 const dashQuery = queryOptions({
   queryKey: ["kobo-dashboard"],
@@ -284,7 +285,7 @@ function Dashboard() {
           </Panel>
 
           <Panel title="Spatial Locations (Captured GPS)">
-            <GpsMap points={gpsPoints} />
+            <GpsLeafletMap points={gpsPoints} />
           </Panel>
         </section>
 
