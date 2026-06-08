@@ -55,16 +55,31 @@ function DashboardPage() {
 function Dashboard() {
   const { data, refetch, isFetching } = useSuspenseQuery(dashQuery);
   const [districtFilter, setDistrictFilter] = useState<string>("All");
+  const [enumeratorFilter, setEnumeratorFilter] = useState<string>("All");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   const submissions = data.submissions;
   const districts = useMemo(
     () => Array.from(new Set(submissions.map((s) => s.district))).sort(),
     [submissions],
   );
-  const filtered = useMemo(
-    () => (districtFilter === "All" ? submissions : submissions.filter((s) => s.district === districtFilter)),
-    [submissions, districtFilter],
+  const enumerators = useMemo(
+    () => Array.from(new Set(submissions.map((s) => s.enumerator_id))).sort(),
+    [submissions],
   );
+  const filtered = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 24 * 3600 * 1000 : null;
+    return submissions.filter((s) => {
+      if (districtFilter !== "All" && s.district !== districtFilter) return false;
+      if (enumeratorFilter !== "All" && s.enumerator_id !== enumeratorFilter) return false;
+      const ts = new Date(s.submission_time).getTime();
+      if (fromTs && ts < fromTs) return false;
+      if (toTs && ts >= toTs) return false;
+      return true;
+    });
+  }, [submissions, districtFilter, enumeratorFilter, dateFrom, dateTo]);
 
   const total = filtered.length;
   const avgDuration =
@@ -144,6 +159,54 @@ function Dashboard() {
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
+          </div>
+        </section>
+
+        {/* Extra filters */}
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-xl bg-card border border-border p-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Enumerator</div>
+            <select
+              value={enumeratorFilter}
+              onChange={(e) => setEnumeratorFilter(e.target.value)}
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="All">All Enumerators</option>
+              {enumerators.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">From Date</div>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">To Date</div>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setDistrictFilter("All");
+                setEnumeratorFilter("All");
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="w-full rounded-md bg-secondary hover:bg-secondary/70 px-3 py-2 text-sm border border-border"
+            >
+              Reset Filters
+            </button>
           </div>
         </section>
 
