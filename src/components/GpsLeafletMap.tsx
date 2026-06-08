@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Submission } from "@/lib/kobo.functions";
-import geojsonData from "@/assets/ug_districts.json";
+import regionsAsset from "@/assets/udhs-regions-2019.json.asset.json";
 
 type Props = { points: Submission[] };
 
@@ -18,7 +18,8 @@ export function GpsLeafletMap({ points }: Props) {
         import("leaflet"),
         import("leaflet/dist/leaflet.css"),
       ]);
-      const geo = geojsonData;
+      const res = await fetch(regionsAsset.url);
+      const geo = await res.json();
       if (cancelled) return;
       setMod(rl);
       setL(leaflet);
