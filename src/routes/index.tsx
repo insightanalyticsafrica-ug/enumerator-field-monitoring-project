@@ -22,10 +22,18 @@ import { MapPin, Bell, RefreshCw, Download, AlertTriangle } from "lucide-react";
 import { getDashboardData, type Submission } from "@/lib/kobo.functions";
 import { GpsLeafletMap } from "@/components/GpsLeafletMap";
 
-const dashQuery = queryOptions({
+interface DashboardData {
+  submissions: Submission[];
+  fetchedAt: string;
+  error?: string | null;
+}
+
+const dashQuery = queryOptions<DashboardData>({
   queryKey: ["kobo-dashboard"],
-  queryFn: () => getDashboardData(),
+  queryFn: () => getDashboardData() as Promise<DashboardData>,
   refetchInterval: 60_000,
+  staleTime: 0,             // Force data to be considered immediately stale
+  gcTime: 0,                // Prevent garbage collection caching of errors
 });
 
 export const Route = createFileRoute("/")({
@@ -46,7 +54,7 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted-foreground">Loading field data…</div>}>
+    <Suspense fallback={<div className="p-8 text-muted-foreground animate-pulse">Loading field data…</div>}>
       <Dashboard />
     </Suspense>
   );
@@ -59,7 +67,8 @@ function Dashboard() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
 
-  const submissions = data.submissions;
+  const submissions = data.submissions || [];
+  
   const districts = useMemo(
     () => Array.from(new Set(submissions.map((s) => s.district))).sort(),
     [submissions],
@@ -68,6 +77,7 @@ function Dashboard() {
     () => Array.from(new Set(submissions.map((s) => s.enumerator_id))).sort(),
     [submissions],
   );
+  
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTs = dateTo ? new Date(dateTo).getTime() + 24 * 3600 * 1000 : null;
@@ -92,10 +102,12 @@ function Dashboard() {
   const enumProductivity = useMemo(() => groupEnumerators(filtered).slice(0, 10), [filtered]);
   const dailyTrend = useMemo(() => groupDaily(filtered), [filtered]);
   const durationByEnum = useMemo(() => groupEnumerators(filtered).slice(0, 10), [filtered]);
+  
   const gpsPie = [
     { name: "Captured", value: filtered.filter((s) => s.gps_captured === 1).length },
     { name: "Missing", value: filtered.filter((s) => s.gps_captured === 0).length },
   ];
+  
   const qualityDist = useMemo(() => qualityBuckets(filtered), [filtered]);
   const alerts = useMemo(
     () => filtered.filter((s) => s.quality_score < 80).slice(0, 12),
@@ -109,8 +121,8 @@ function Dashboard() {
         {/* Header */}
         <header className="flex items-center justify-between rounded-xl bg-card px-5 py-4 border border-border shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-[var(--kpi-blue)]/20 grid place-items-center">
-              <MapPin className="h-5 w-5 text-[var(--kpi-blue)]" />
+            <div className="h-10 w-10 rounded-lg bg-blue-500/20 grid place-items-center">
+              <MapPin className="h-5 w-5 text-blue-500" />
             </div>
             <h1 className="text-xl md:text-2xl font-bold tracking-wide">
               ENUMERATOR FIELD MONITORING
@@ -120,17 +132,17 @@ function Dashboard() {
             <button
               onClick={() => refetch()}
               className="relative p-2 rounded-lg hover:bg-secondary"
-              title="Refresh"
+              title="Refresh Alerts"
             >
               <Bell className="h-5 w-5" />
               {alerts.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-[10px] grid place-items-center px-1">
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-[10px] grid place-items-center px-1 text-white font-bold">
                   {alerts.length}
                 </span>
               )}
             </button>
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[var(--kpi-orange)] to-[var(--kpi-red)] grid place-items-center text-sm font-semibold">
-              ME
+            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-orange-500 to-red-500 grid place-items-center text-sm font-semibold text-white">
+              IA
             </div>
           </div>
         </header>
@@ -143,16 +155,16 @@ function Dashboard() {
 
         {/* KPIs */}
         <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <KpiTile label="Total Submissions" value={total.toLocaleString()} color="var(--kpi-blue)" />
-          <KpiTile label="Avg. Interview Duration" value={`${avgDuration.toFixed(1)} min`} color="var(--kpi-orange)" />
-          <KpiTile label="GPS Completeness" value={`${gpsCompleteness.toFixed(1)}%`} color="var(--kpi-green)" />
-          <KpiTile label="Data Quality Score" value={`${avgQuality.toFixed(0)}%`} color="var(--kpi-red)" />
-          <div className="rounded-xl bg-card border border-border p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">District Filter</div>
+          <KpiTile label="Total Submissions" value={total.toLocaleString()} color="#3b82f6" />
+          <KpiTile label="Avg. Interview Duration" value={`${avgDuration.toFixed(1)} min`} color="#f97316" />
+          <KpiTile label="GPS Completeness" value={`${gpsCompleteness.toFixed(1)}%`} color="#22c55e" />
+          <KpiTile label="Data Quality Score" value={`${avgQuality.toFixed(0)}%`} color="#ef4444" />
+          <div className="rounded-xl bg-card border border-border p-4 shadow-sm">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-medium">District Filter</div>
             <select
               value={districtFilter}
               onChange={(e) => setDistrictFilter(e.target.value)}
-              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring text-sm"
             >
               <option value="All">All Districts</option>
               {districts.map((d) => (
@@ -163,13 +175,13 @@ function Dashboard() {
         </section>
 
         {/* Extra filters */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-xl bg-card border border-border p-4">
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-xl bg-card border border-border p-4 shadow-sm">
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Enumerator</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-medium">Enumerator</div>
             <select
               value={enumeratorFilter}
               onChange={(e) => setEnumeratorFilter(e.target.value)}
-              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring text-sm"
             >
               <option value="All">All Enumerators</option>
               {enumerators.map((d) => (
@@ -178,21 +190,21 @@ function Dashboard() {
             </select>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">From Date</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-medium">From Date</div>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring text-sm"
             />
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">To Date</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-medium">To Date</div>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full bg-secondary text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring text-sm"
             />
           </div>
           <div className="flex items-end">
@@ -203,7 +215,7 @@ function Dashboard() {
                 setDateFrom("");
                 setDateTo("");
               }}
-              className="w-full rounded-md bg-secondary hover:bg-secondary/70 px-3 py-2 text-sm border border-border"
+              className="w-full rounded-md bg-secondary hover:bg-secondary/70 px-3 py-2 text-sm border border-border font-medium transition-colors"
             >
               Reset Filters
             </button>
@@ -213,26 +225,26 @@ function Dashboard() {
         {/* Row 2 */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Panel title="Enumerator Productivity (Top 10)">
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={260} minWidth={0}>
               <ComposedChart data={enumProductivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="enumerator" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis yAxisId="left" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} stroke="var(--muted-foreground)" fontSize={11} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Bar yAxisId="left" dataKey="submissions" fill="var(--chart-orange)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="avgQuality" stroke="var(--chart-green)" strokeWidth={2} dot={{ r: 3 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" />
+                <XAxis dataKey="enumerator" stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <YAxis yAxisId="left" stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <Tooltip contentStyle={{ backgroundColor: "#1f2937", borderRadius: "8px", color: "#fff", border: "none" }} />
+                <Bar yAxisId="left" dataKey="submissions" fill="#f97316" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="avgQuality" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </Panel>
 
           <Panel title="Daily Submissions Trend">
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={260} minWidth={0}>
               <LineChart data={dailyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" />
+                <XAxis dataKey="date" stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <YAxis stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <Tooltip contentStyle={{ backgroundColor: "#1f2937", borderRadius: "8px", color: "#fff", border: "none" }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {districts.map((d, i) => (
                   <Line
@@ -250,9 +262,9 @@ function Dashboard() {
 
           <Panel
             title="Data Quality Monitoring (Alerts)"
-            titleBg="var(--kpi-red)"
+            titleBg="rgba(239, 68, 68, 0.1)"
             headerExtra={
-              <span className="text-xs bg-card text-foreground rounded-full px-2 py-0.5 border border-border">
+              <span className="text-xs bg-destructive/10 text-destructive rounded-full px-2 py-0.5 border border-destructive/20 font-medium">
                 <Bell className="inline h-3 w-3 mr-1" />
                 {alerts.length} Alerts
               </span>
@@ -260,7 +272,7 @@ function Dashboard() {
           >
             <div className="overflow-auto max-h-[260px]">
               <table className="w-full text-xs">
-                <thead className="text-muted-foreground border-b border-border">
+                <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card">
                   <tr className="text-left">
                     <th className="py-2 px-2">ID</th>
                     <th className="py-2 px-2">Enumerator</th>
@@ -273,19 +285,19 @@ function Dashboard() {
                   {alerts.length === 0 ? (
                     <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No quality alerts</td></tr>
                   ) : alerts.map((a) => (
-                    <tr key={String(a.submission_id)} className="border-b border-border/40 hover:bg-secondary/40">
-                      <td className="py-1.5 px-2">{String(a.submission_id).slice(0, 6)}</td>
-                      <td className="py-1.5 px-2">{a.enumerator_id}</td>
+                    <tr key={String(a.submission_id)} className="border-b border-border/40 hover:bg-secondary/40 transition-colors">
+                      <td className="py-1.5 px-2 font-mono">{String(a.submission_id).slice(0, 6)}</td>
+                      <td className="py-1.5 px-2 font-medium">{a.enumerator_id}</td>
                       <td className="py-1.5 px-2">
-                        <span className="inline-flex items-center gap-1 rounded bg-destructive/20 text-destructive px-1.5 py-0.5">
+                        <span className="inline-flex items-center gap-1 rounded bg-destructive/10 text-destructive px-1.5 py-0.5 border border-destructive/20 font-medium">
                           <AlertTriangle className="h-3 w-3" />
                           {a.flag_reason}
                         </span>
                       </td>
                       <td className="py-1.5 px-2">
                         <span
-                          className="rounded px-1.5 py-0.5 text-[var(--primary-foreground)]"
-                          style={{ background: scoreColor(a.quality_score) }}
+                          className="rounded px-1.5 py-0.5 text-white font-semibold text-[11px]"
+                          style={{ backgroundColor: scoreColor(a.quality_score) }}
                         >
                           {a.quality_score}%
                         </span>
@@ -304,43 +316,46 @@ function Dashboard() {
         {/* Row 3 */}
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <Panel title="Average Interview Duration by Enumerator" subtitle="Under 15 minutes flags potential rush jobs">
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={220} minWidth={0}>
               <BarChart data={durationByEnum}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="enumerator" stroke="var(--muted-foreground)" fontSize={10} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={10} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <ReferenceLine y={15} stroke="var(--chart-red)" strokeDasharray="4 4" />
-                <Bar dataKey="avgDuration" fill="var(--chart-orange)" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" />
+                <XAxis dataKey="enumerator" stroke="currentColor" className="text-muted-foreground" fontSize={10} />
+                <YAxis stroke="currentColor" className="text-muted-foreground" fontSize={10} />
+                <Tooltip contentStyle={{ backgroundColor: "#1f2937", borderRadius: "8px", color: "#fff", border: "none" }} />
+                <ReferenceLine y={15} stroke="#ef4444" strokeDasharray="4 4" />
+                <Bar dataKey="avgDuration" fill="#f97316" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Panel>
 
           <Panel title="GPS Completeness">
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={gpsPie} dataKey="value" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                  <Cell fill="var(--chart-green)" />
-                  <Cell fill="var(--chart-red)" />
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="text-center -mt-3 text-2xl font-bold text-[var(--chart-green)]">
-              {gpsCompleteness.toFixed(0)}%
+            <div className="relative h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={gpsPie} dataKey="value" innerRadius={55} outerRadius={75} paddingAngle={3}>
+                    <Cell fill="#22c55e" />
+                    <Cell fill="#ef4444" />
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", borderRadius: "8px", color: "#fff", border: "none" }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-bold text-green-500">{gpsCompleteness.toFixed(0)}%</span>
+                <span className="text-[10px] uppercase text-muted-foreground tracking-wider">Captured</span>
+              </div>
             </div>
           </Panel>
 
           <Panel title="Submission Quality Scoring">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={qualityDist}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="bucket" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" />
+                <XAxis dataKey="bucket" stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <YAxis stroke="currentColor" className="text-muted-foreground" fontSize={11} />
+                <Tooltip contentStyle={{ backgroundColor: "#1f2937", borderRadius: "8px", color: "#fff", border: "none" }} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {qualityDist.map((q, i) => (
-                    <Cell key={i} fill={q.bucket === "High" ? "var(--chart-green)" : q.bucket === "Medium" ? "var(--chart-orange)" : "var(--chart-red)"} />
+                    <Cell key={i} fill={q.bucket === "High" ? "#22c55e" : q.bucket === "Medium" ? "#f97316" : "#ef4444"} />
                   ))}
                 </Bar>
               </BarChart>
@@ -348,26 +363,34 @@ function Dashboard() {
           </Panel>
 
           <Panel title="Spatial Locations (Captured GPS)">
-            <GpsLeafletMap points={gpsPoints} />
+            <div className="h-[220px] rounded-md overflow-hidden border border-border">
+              {gpsPoints.length > 0 ? (
+                <GpsLeafletMap points={gpsPoints} />
+              ) : (
+                <div className="h-full grid place-items-center text-sm text-muted-foreground bg-secondary/20">
+                  No GPS coordinates captured yet
+                </div>
+              )}
+            </div>
           </Panel>
         </section>
 
         {/* Footer actions */}
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-card border border-border p-4">
-          <div className="text-xs text-muted-foreground">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-card border border-border p-4 shadow-sm">
+          <div className="text-xs text-muted-foreground font-medium">
             Live KoboToolbox feed • last refreshed {new Date(data.fetchedAt).toLocaleTimeString()}
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => exportCsv(filtered)}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--kpi-blue)] text-[var(--primary-foreground)] px-4 py-2 text-sm font-medium hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
             >
               <Download className="h-4 w-4" /> Export Data
             </button>
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--chart-green)] text-[var(--primary-foreground)] px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60 shadow-sm"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
             </button>
@@ -378,35 +401,30 @@ function Dashboard() {
   );
 }
 
-/* ---------- helpers & subcomponents ---------- */
-
-const tooltipStyle = {
-  background: "oklch(0.2 0.05 260)",
-  border: "1px solid oklch(0.35 0.05 262)",
-  borderRadius: 8,
-  fontSize: 12,
-  color: "white",
-};
+/* ---------- helpers ---------- */
 
 function districtColor(i: number) {
-  const palette = ["var(--chart-orange)", "var(--chart-green)", "var(--chart-blue)", "var(--chart-yellow)", "var(--chart-red)"];
+  const palette = ["#f97316", "#22c55e", "#3b82f6", "#eab308", "#ef4444"];
   return palette[i % palette.length];
 }
 
 function scoreColor(score: number) {
-  if (score >= 80) return "var(--chart-green)";
-  if (score >= 60) return "var(--chart-orange)";
-  return "var(--chart-red)";
+  if (score >= 80) return "#22c55e";
+  if (score >= 60) return "#f97316";
+  return "#ef4444";
 }
 
 function KpiTile({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div
-      className="rounded-xl border border-border p-4 shadow-lg"
-      style={{ background: `color-mix(in oklab, ${color} 18%, var(--card))`, borderColor: `color-mix(in oklab, ${color} 50%, transparent)` }}
+      className="rounded-xl border border-border p-4 shadow-sm"
+      style={{ 
+        backgroundColor: `${color}10`, 
+        borderColor: `${color}30` 
+      }}
     >
-      <div className="text-xs uppercase tracking-wide text-foreground/80">{label}</div>
-      <div className="mt-1 text-3xl md:text-4xl font-bold" style={{ color }}>{value}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">{label}</div>
+      <div className="mt-1 text-2xl md:text-3xl font-bold" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -421,18 +439,18 @@ function Panel({
   headerExtra?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl bg-card border border-border shadow-lg overflow-hidden">
+    <div className="rounded-xl bg-card border border-border shadow-md overflow-hidden flex flex-col justify-between">
       <div
-        className="flex items-center justify-between px-4 py-2.5"
-        style={titleBg ? { background: titleBg } : undefined}
+        className="flex items-center justify-between px-4 py-3 border-b border-border"
+        style={titleBg ? { backgroundColor: titleBg } : undefined}
       >
         <div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-          {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+          <h3 className="text-sm font-bold tracking-wide text-foreground">{title}</h3>
+          {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
         {headerExtra}
       </div>
-      <div className="p-3">{children}</div>
+      <div className="p-4 flex-1 flex flex-col justify-center">{children}</div>
     </div>
   );
 }
@@ -479,42 +497,6 @@ function qualityBuckets(rows: Submission[]) {
     { bucket: "Medium", count: buckets.Medium },
     { bucket: "Low", count: buckets.Low },
   ];
-}
-
-function GpsMap({ points }: { points: Submission[] }) {
-  if (points.length === 0) {
-    return (
-      <div className="h-[220px] grid place-items-center text-sm text-muted-foreground">
-        No GPS coordinates captured yet
-      </div>
-    );
-  }
-  const lats = points.map((p) => p.gps_lat!);
-  const lngs = points.map((p) => p.gps_lng!);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const dLat = maxLat - minLat || 0.01;
-  const dLng = maxLng - minLng || 0.01;
-  return (
-    <svg viewBox="0 0 300 220" className="w-full h-[220px] rounded-md bg-secondary/40">
-      <defs>
-        <radialGradient id="heat">
-          <stop offset="0%" stopColor="var(--chart-red)" stopOpacity={0.9} />
-          <stop offset="100%" stopColor="var(--chart-red)" stopOpacity={0} />
-        </radialGradient>
-      </defs>
-      {points.map((p, i) => {
-        const x = ((p.gps_lng! - minLng) / dLng) * 280 + 10;
-        const y = 210 - ((p.gps_lat! - minLat) / dLat) * 200;
-        return <circle key={i} cx={x} cy={y} r={10} fill="url(#heat)" />;
-      })}
-      {points.map((p, i) => {
-        const x = ((p.gps_lng! - minLng) / dLng) * 280 + 10;
-        const y = 210 - ((p.gps_lat! - minLat) / dLat) * 200;
-        return <circle key={`d-${i}`} cx={x} cy={y} r={2} fill="var(--chart-yellow)" />;
-      })}
-    </svg>
-  );
 }
 
 function exportCsv(rows: Submission[]) {

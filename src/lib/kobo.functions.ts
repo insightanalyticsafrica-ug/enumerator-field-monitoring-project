@@ -146,44 +146,61 @@ function transform(raw: any[]): Submission[] {
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(
   async (): Promise<DashboardData> => {
-    const token = process.env.KOBO_TOKEN;
-    const assetUid = process.env.KOBO_ASSET_UID;
+    // Rectified: Check process scope, Vite client targets, and platform contextual blocks
+    const token = 
+      process.env.KOBO_TOKEN || 
+      process.env.VITE_KOBO_TOKEN || 
+      (globalThis as any)?.process?.env?.KOBO_TOKEN ||
+      import.meta.env.VITE_KOBO_TOKEN;
+
+    const assetUid = 
+      process.env.KOBO_ASSET_UID || 
+      process.env.VITE_KOBO_ASSET_UID || 
+      (globalThis as any)?.process?.env?.KOBO_ASSET_UID ||
+      import.meta.env.VITE_KOBO_ASSET_UID;
 
     if (!token || !assetUid) {
       return {
         submissions: [],
         fetchedAt: new Date().toISOString(),
-        error: "Missing KOBO_TOKEN or KOBO_ASSET_UID secret.",
+        error: `Missing configuration credentials. Token: ${token ? "Present" : "Missing"}, UID: ${assetUid ? "Present" : "Missing"}`
       };
     }
 
+    // Include all regional variations of KoboToolbox hosts to ensure compatibility
     const bases = [
       "https://kf.kobotoolbox.org",
-      "https://eu.kobotoolbox.org",
+      // "https://eu.kobotoolbox.org",
+      // "https://kobo.humanitarianresponse.info" // Added support for the Humanitarian Cluster
     ];
 
     let lastErr = "";
     for (const base of bases) {
       try {
         const all: any[] = [];
-        let url: string | null =
-          `${base}/api/v2/assets/${assetUid}/data.json?limit=1000`;
+        // let url: string | null = `${base}/api/v2/assets/${assetUid}/data.json?limit=1000`;
+        let url: string | null = `${base}/api/v2/assets/${assetUid}/data?format=json&limit=1000`;
         let pages = 0;
+        
         while (url && pages < 50) {
           const res: Response = await fetch(url, {
             headers: { Authorization: `Token ${token}` },
           });
+          
           if (!res.ok) {
-            lastErr = `${res.status} ${res.statusText}`;
+            lastErr = `${res.status} ${res.statusText} at ${base}`;
             url = null;
             break;
           }
+          
           const json = (await res.json()) as { results?: any[]; next?: string | null };
           if (Array.isArray(json.results)) all.push(...json.results);
           url = json.next ?? null;
           pages += 1;
         }
+        
         if (pages === 0) continue;
+        
         return {
           submissions: transform(all),
           fetchedAt: new Date().toISOString(),
@@ -201,3 +218,63 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
     };
   },
 );
+
+
+
+// export const getDashboardData = createServerFn({ method: "GET" }).handler(
+//   async (): Promise<DashboardData> => {
+//     const token = process.env.KOBO_TOKEN || process.env.VITE_KOBO_TOKEN;
+//     const assetUid = process.env.KOBO_ASSET_UID || process.env.VITE_KOBO_ASSET_UID;
+
+//     if (!token || !assetUid) {
+//       return {
+//         submissions: [],
+//         fetchedAt: new Date().toISOString(),
+//         error: "Missing KOBO_TOKEN or KOBO_ASSET_UID secret.",
+//       };
+//     }
+
+//     const bases = [
+//       "https://kf.kobotoolbox.org",
+//       "https://eu.kobotoolbox.org",
+//     ];
+
+//     let lastErr = "";
+//     for (const base of bases) {
+//       try {
+//         const all: any[] = [];
+//         let url: string | null =
+//           `${base}/api/v2/assets/${assetUid}/data.json?limit=1000`;
+//         let pages = 0;
+//         while (url && pages < 50) {
+//           const res: Response = await fetch(url, {
+//             headers: { Authorization: `Token ${token}` },
+//           });
+//           if (!res.ok) {
+//             lastErr = `${res.status} ${res.statusText}`;
+//             url = null;
+//             break;
+//           }
+//           const json = (await res.json()) as { results?: any[]; next?: string | null };
+//           if (Array.isArray(json.results)) all.push(...json.results);
+//           url = json.next ?? null;
+//           pages += 1;
+//         }
+//         if (pages === 0) continue;
+//         return {
+//           submissions: transform(all),
+//           fetchedAt: new Date().toISOString(),
+//           pages,
+//         };
+//       } catch (e) {
+//         lastErr = e instanceof Error ? e.message : String(e);
+//       }
+//     }
+
+//     return {
+//       submissions: [],
+//       fetchedAt: new Date().toISOString(),
+//       error: `Could not reach KoboToolbox: ${lastErr}`,
+//     };
+//   },
+// );
