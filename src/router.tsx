@@ -7,6 +7,8 @@ export const getRouter = () => {
 
   const router = createRouter({
     routeTree,
+    // Add this exact line right below routeTree:
+    basepath: process.env.NODE_ENV === 'production' ? '/enumerator-field-monitoring-project' : '/',
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
