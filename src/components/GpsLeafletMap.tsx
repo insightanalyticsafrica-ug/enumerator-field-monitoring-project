@@ -1,6 +1,8 @@
+
 import { useEffect, useState } from "react";
 import type { Submission } from "@/lib/kobo.functions";
-import regionsAsset from "@/assets/udhs-regions-2019.json.asset.json";
+// import regionsAsset from "@/assets/udhs-regions-2019.json.asset.json";
+import regionsGeoJSON from "@/assets/uganda_districts_2019-wgs84.json";
 
 type Props = { points: Submission[] };
 
@@ -8,28 +10,59 @@ export function GpsLeafletMap({ points }: Props) {
   const [mounted, setMounted] = useState(false);
   const [Mod, setMod] = useState<any>(null);
   const [L, setL] = useState<any>(null);
+  console.log("REGIONS DATA:", regionsGeoJSON);
   const [regions, setRegions] = useState<any>(null);
 
+  
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
-      const [rl, leaflet] = await Promise.all([
-        import("react-leaflet"),
-        import("leaflet"),
-        import("leaflet/dist/leaflet.css"),
-      ]);
-      const res = await fetch(regionsAsset.url);
-      const geo = await res.json();
-      if (cancelled) return;
-      setMod(rl);
-      setL(leaflet);
-      setRegions(geo);
-      setMounted(true);
+      try {
+        const [rl, leaflet] = await Promise.all([
+          import("react-leaflet"),
+          import("leaflet"),
+          import("leaflet/dist/leaflet.css"),
+        ]);
+
+        const geo = regionsGeoJSON;
+
+        if (cancelled) return;
+
+        setMod(rl);
+        setL(leaflet);
+        setRegions(geo);
+        setMounted(true);
+      } catch (err) {
+        console.error("Map loading failed:", err);
+        }
     })();
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   (async () => {
+  //     const [rl, leaflet] = await Promise.all([
+  //       import("react-leaflet"),
+  //       import("leaflet"),
+  //       import("leaflet/dist/leaflet.css"),
+  //     ]);
+  //     const res = await fetch(regionsAsset.url);
+  //     const geo = await res.json();
+  //     if (cancelled) return;
+  //     setMod(rl);
+  //     setL(leaflet);
+  //     setRegions(geo);
+  //     setMounted(true);
+  //   })();
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, []);
 
   if (!mounted || !Mod || !L) {
     return (
