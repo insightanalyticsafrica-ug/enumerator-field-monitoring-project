@@ -26,7 +26,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     // CRITICAL: Tells the compiler to look inside your specific repository folder path
-    base: process.env.NODE_ENV === 'production' ? '/enumerator-field-monitoring-project/' : '/',
+    base: "/enumerator-field-monitoring-project/",
+    // base: process.env.NODE_ENV === 'production' ? '/enumerator-field-monitoring-project/' : '/',
     server: {
       port: 5173,
       strictPort: true,
