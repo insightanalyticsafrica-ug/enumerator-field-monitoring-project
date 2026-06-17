@@ -3,10 +3,11 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+
   "scripts": {
   "dev": "vite dev",
   "build": "vite build",
-  "start": "node dist/server/server.js"
+  "start": "vite build && node dist/server/server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
