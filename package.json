@@ -3,12 +3,12 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "scripts": {
-  "dev": "vinxi dev",
-  "build": "vinxi build",
-  "start": "vinxi start"
-  },
   
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "vite build && node dist/server/server.js"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
