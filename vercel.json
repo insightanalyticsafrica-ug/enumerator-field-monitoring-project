@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "framework": "vite",
+  "framework": "tanstack-start",
   "builds": [
     {
       "src": "package.json",
